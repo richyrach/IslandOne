@@ -1,0 +1,46 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile APK
+        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Rename output
+        run: cp app/build/outputs/apk/debug/app-debug.apk IslandOne-preview.apk
+      - name: Archive test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IslandOne-preview-APK
+          path: IslandOne-preview.apk
+          if-no-files-found: error
+      - name: Publish public preview APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release upload nightly IslandOne-preview.apk --clobber
+          else
+            gh release create nightly IslandOne-preview.apk --title "IslandOne preview" --notes "Automatically built, unsigned-for-production DEBUG APK. Early preview, untested on all devices. Android debug signing keys can change between builds: you may need to uninstall an earlier preview before updating." --prerelease --target "$GITHUB_SHA"
+          fi
