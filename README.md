@@ -1,29 +1,52 @@
 # IslandOne
 
-An open-source Dynamic Island-style overlay for Android.
+**A Dynamic Island-style Android overlay. Open source, no ads.**
 
-**Early preview.** Designed around the centered punch-hole camera on the Galaxy S24 FE; also intended to support other Android devices.
+Built for centered punch-hole displays, including the Galaxy S24 FE. IslandOne is an early preview; the design and interaction details are still being refined on actual phones.
 
-### Goals
-- Compact, animated floating pill
-- Music playback and album artwork
-- Notification previews
-- Battery and charging indicators
-- On-device timers
-- Adjustable size and position
+## Download
 
-No file tray or camera tools. No trackers, ads, or internet permission.
+**[Download the latest preview APK](https://github.com/richyrach/IslandOne/releases/download/nightly/IslandOne-preview.apk)**
 
-### Get the APK
-When the Android build workflow succeeds, download the test APK from [Actions](../../actions). A publicly downloadable preview release will be published by the workflow as **nightly**.
+The Android APK is automatically compiled and published using [GitHub Actions](../../actions). Source code is in this repository.
 
-> Pre-release software: not yet tested on physical S24 FE hardware. Android overlays cannot truly replace the system status bar, the cutout, the lock screen or all system UI. Some integrations require notification access and may vary by app.
+### Current features
 
-### Building
-Android Studio + JDK 17, Android SDK 35 and Gradle 8.9. Run `gradle assembleDebug` or use the GitHub Actions workflow.
+- Native Android settings screen, styled island preview and compact/rounded style selection
+- Floating expandable music player with artwork, media controls, a progress bar and timestamps
+- Notification previews and action buttons when supported by the originating app
+- Charging/battery status and quick timers
+- Vertical/horizontal positioning, adjustable width and height
+- Foreground service so the island can keep running; reduced idle polling
+- Optional GitHub update checks when opening the app, plus **Download** in an update dialog
 
-### Privacy
-Only overlay and notification access are requested for the relevant features. There is no network permission. Notification previews may display private text over other apps; grant access only if comfortable.
+No file tray, camera, ad SDK, or trackers.
 
-### License
-MIT. See [LICENSE](LICENSE).
+### Enable on a Samsung
+
+1. Install the APK, open IslandOne, and enable **Display over other apps**.
+2. Enable **Notification access** for media sessions and preview notifications.
+3. Go to **Settings → Apps → IslandOne → Battery** and select **Unrestricted**, if shown. Actual battery settings vary by One UI version.
+4. Adjust the island position around your camera cutout. Turn off competing island apps while comparing them.
+
+If Android blocks notification access for a sideloaded app, open its **App info**, tap the upper-right menu, and check whether **Allow restricted settings** is available. Only allow access if you trust the app.
+
+### Updates and signing
+
+The update checker fetches a JSON file from this project's public GitHub release. It performs no analytics and sends no identifiers. Downloading an update opens GitHub in your browser; Android controls installation.
+
+**Important:** These are GitHub **debug APKs**. Their signing identity can change between builds, so Android may refuse to install the next APK on top of the previous one. In that case, uninstall the old preview first (this resets settings). Stable update-in-place behavior needs an owner-controlled signing key configured securely in GitHub Actions; never commit that private key.
+
+### Limitations
+
+Android does not give third-party overlays Apple's system-level Dynamic Island integration. Some Android or Samsung system UI takes priority over overlays. Notification data and actions vary by app. The overlay is not a replacement for Samsung's Now Bar, and cannot remove the physical camera cutout.
+
+For now, this is **preview software**, not a production-signed release or something tested on every phone.
+
+## Building locally
+
+Use Android Studio with JDK 17 and Android SDK 35, or execute `gradle assembleDebug` with Gradle 8.9. The CI builds the Android app from scratch and attaches an APK to the nightly pre-release.
+
+## Project license
+
+MIT. See [LICENSE](LICENSE). Contributions, bug reports and device screenshots are welcome.
