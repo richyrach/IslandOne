@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   apk:
-    name: Android debug build
+    name: Android preview APK
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -28,8 +28,10 @@ jobs:
           gradle-version: '8.9'
       - name: Compile APK
         run: gradle --no-daemon --stacktrace assembleDebug
-      - name: Rename output
-        run: cp app/build/outputs/apk/debug/app-debug.apk IslandOne-preview.apk
+      - name: Prepare preview release
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk IslandOne-preview.apk
+          printf '{"versionCode":%d,"downloadUrl":"https://github.com/richyrach/IslandOne/releases/download/nightly/IslandOne-preview.apk"}\n' "$((200 + GITHUB_RUN_NUMBER))" > version.json
       - name: Archive test APK
         uses: actions/upload-artifact@v4
         with:
@@ -40,8 +42,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          NOTES="Automatically built early preview. Android debug signing keys can change between builds; uninstall the previous preview if Android rejects an update. NOT production signed."
           if gh release view nightly >/dev/null 2>&1; then
-            gh release upload nightly IslandOne-preview.apk --clobber
+            gh release upload nightly IslandOne-preview.apk version.json --clobber
+            gh release edit nightly --title "IslandOne preview build ${GITHUB_RUN_NUMBER}" --notes "$NOTES"
           else
-            gh release create nightly IslandOne-preview.apk --title "IslandOne preview" --notes "Automatically built, unsigned-for-production DEBUG APK. Early preview, untested on all devices. Android debug signing keys can change between builds: you may need to uninstall an earlier preview before updating." --prerelease --target "$GITHUB_SHA"
+            gh release create nightly IslandOne-preview.apk version.json --title "IslandOne preview build ${GITHUB_RUN_NUMBER}" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
