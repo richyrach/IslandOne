@@ -52,7 +52,8 @@ public final class IslandService extends Service implements IslandEvents.Listene
     private WindowManager.LayoutParams params;
     private FrameLayout bubble;
     private LinearLayout mini, details, alertPanel;
-    private TextView miniLeft,miniRight,songName,artist,play,batteryText,timerText,alertText;
+    private TextView miniLeft,miniRight,songName,artist,play,batteryText,timerText,alertText,elapsed,durationLabel;
+    private ImageView miniArt;
     private ImageView cover;
     private SeekBar progress;
     private boolean expanded=false,charging=false,batteryInitialized=false,scrubbing=false;
@@ -74,9 +75,9 @@ public final class IslandService extends Service implements IslandEvents.Listene
         int counter=0;
         @Override public void run(){
             if(bubble==null)return;
-            if(counter++%5==0)scanMedia();
-            update();
-            main.postDelayed(this,1000);
+            if(counter++%3==0)scanMedia();
+            if(expanded || timerRemaining>=0 || charging)update();
+            main.postDelayed(this,(expanded&&playing()) || timerRemaining>=0?1000:5000);
         }
     };
     private final BroadcastReceiver powerReceiver=new BroadcastReceiver(){
@@ -132,10 +133,16 @@ public final class IslandService extends Service implements IslandEvents.Listene
         bubble.setElevation(d(12));
         bubble.setClipToOutline(true);
 
-        mini=row();mini.setPadding(d(16),0,d(16),0);
+        mini=row();mini.setPadding(d(7),0,d(14),0);
+        miniArt=new ImageView(this);
+        miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        miniArt.setBackground(bg(0xFF332246,9));
+        miniArt.setClipToOutline(true);
+        miniArt.setVisibility(View.GONE);
+        mini.addView(miniArt,space(28,28,0));
         miniLeft=text("●",17,PURPLE,true);
+        mini.addView(miniLeft,space(35,-1,0));
         miniRight=text("●",12,0xFF7FE3B8,true);
-        mini.addView(miniLeft,space(40,-1,0));
         TextView center=text(" ",12,WHITE,false);
         mini.addView(center,new LinearLayout.LayoutParams(0,-1,1));
         mini.addView(miniRight);
@@ -143,16 +150,16 @@ public final class IslandService extends Service implements IslandEvents.Listene
         FrameLayout.LayoutParams compactLp=new FrameLayout.LayoutParams(-1,-1);
         bubble.addView(mini,compactLp);
 
-        details=col();details.setPadding(d(18),d(13),d(18),d(17));
+        details=col();details.setPadding(d(20),d(16),d(20),d(15));
         details.setVisibility(View.GONE);
         FrameLayout.LayoutParams detailLp=new FrameLayout.LayoutParams(-1,-1);
         bubble.addView(details,detailLp);
 
         LinearLayout top=row();
-        TextView eyebrow=text("ISLANDONE   •   NOW PLAYING",10,0xFFABA0C7,true);
+        TextView eyebrow=text("NOW PLAYING",10,0xFFD5D0DF,true);
         eyebrow.setLetterSpacing(.12f);
         top.addView(eyebrow,new LinearLayout.LayoutParams(0,d(23),1));
-        TextView close=text("⌃",24,MUTED,true);close.setGravity(Gravity.CENTER);
+        TextView close=text("⌄",23,MUTED,true);close.setGravity(Gravity.CENTER);
         close.setOnClickListener(v->resize(false,true));
         top.addView(close,space(35,30,0));
         details.addView(top);
@@ -160,13 +167,13 @@ public final class IslandService extends Service implements IslandEvents.Listene
         LinearLayout media=row();
         cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
         cover.setBackground(bg(0xFF2E2442,15));cover.setClipToOutline(true);
-        media.addView(cover,space(65,65,0));
+        media.addView(cover,space(72,72,0));
         LinearLayout labels=col();labels.setPadding(d(14),0,d(4),0);
         songName=text("Not playing",17,WHITE,true);
         artist=text("Play something to get started",12,MUTED,false);
         labels.addView(songName);labels.addView(artist,space(-1,-2,5));
         media.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
-        details.addView(media,space(-1,70,14));
+        details.addView(media,space(-1,73,13));
 
         progress=new SeekBar(this);progress.setMax(1000);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(PURPLE));
@@ -183,7 +190,13 @@ public final class IslandService extends Service implements IslandEvents.Listene
                 scrubbing=false;autoClose(10000);
             }
         });
-        details.addView(progress,space(-1,32,9));
+        details.addView(progress,space(-1,30,8));
+        LinearLayout times=row();
+        elapsed=text("0:00",12,MUTED,false);
+        durationLabel=text("0:00",12,MUTED,false);
+        times.addView(elapsed,new LinearLayout.LayoutParams(0,-2,1));
+        times.addView(durationLabel);
+        details.addView(times,space(-1,19,0));
         LinearLayout transport=row();transport.setGravity(Gravity.CENTER);
         TextView previous=control("⏮",()->mediaAction(-1));
         play=control("▶",()->mediaAction(0));
@@ -231,14 +244,16 @@ public final class IslandService extends Service implements IslandEvents.Listene
         });
         details.addView(alertPanel,space(-1,61,12));
 
-        int width=d(130);
-        params=new WindowManager.LayoutParams(width,d(40),
+        int width=d(preferredWidth());
+        params=new WindowManager.LayoutParams(width,d(preferredHeight()),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT);
         params.gravity=Gravity.TOP|Gravity.CENTER_HORIZONTAL;
         params.y=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("offset",0));
+        params.x=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("horizontal",0));
+        applyStyle();
         wm.addView(bubble,params);
     }
     private int screenWidthDp(){
@@ -246,7 +261,14 @@ public final class IslandService extends Service implements IslandEvents.Listene
                 getResources().getDisplayMetrics().density);
     }
     private int preferredWidth(){
-        return 100+getSharedPreferences("island_config",MODE_PRIVATE).getInt("width",30);
+        return 100+getSharedPreferences("island_config",MODE_PRIVATE).getInt("width",50);
+    }
+    private int preferredHeight(){
+        return getSharedPreferences("island_config",MODE_PRIVATE).getInt("height",42);
+    }
+    private void applyStyle(){
+        int style=getSharedPreferences("island_config",MODE_PRIVATE).getInt("style",0);
+        if(bubble!=null)bubble.setBackground(bg(Color.BLACK,style==0?29:13));
     }
     private void safeUpdate(){
         try{if(bubble!=null&&wm!=null)wm.updateViewLayout(bubble,params);}
@@ -258,13 +280,14 @@ public final class IslandService extends Service implements IslandEvents.Listene
         if(animation!=null)animation.cancel();
         expanded=show;
         int width=d(show?Math.min(screenWidthDp()-16,360):preferredWidth());
-        int height=d(show?(alertPanel.getVisibility()==View.VISIBLE?405:333):40);
+        int height=d(show?(alertPanel.getVisibility()==View.VISIBLE?463:389):preferredHeight());
         params.y=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("offset",0));
+        params.x=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("horizontal",0));
         if(!animate){
             params.width=width;params.height=height;
             mini.setVisibility(show?View.GONE:View.VISIBLE);
             details.setVisibility(show?View.VISIBLE:View.GONE);
-            details.setAlpha(1f);bubble.setBackground(bg(Color.BLACK,show?29:23));
+            details.setAlpha(1f);applyStyle();
             safeUpdate();return;
         }
         final int startW=params.width,startH=params.height;
@@ -280,7 +303,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
             safeUpdate();
             if(t>=1f){
                 if(!show){details.setVisibility(View.GONE);mini.setVisibility(View.VISIBLE);}
-                bubble.setBackground(bg(Color.BLACK,show?29:23));
+                applyStyle();
             }
         });
         animation.start();
@@ -356,6 +379,8 @@ public final class IslandService extends Service implements IslandEvents.Listene
         miniRight.setText(timerRemaining>=0?clock(timerRemaining):
                 charging?"⚡"+batteryPercent+"%":music?"▂▅▃":"●");
         miniRight.setTextColor(charging?0xFF98F3CA:PURPLE);
+        miniArt.setVisibility(music?View.VISIBLE:View.GONE);
+        miniLeft.setVisibility(music?View.GONE:View.VISIBLE);
         batteryText.setText("BATTERY  "+(batteryPercent<0?"—":batteryPercent+"%")+(charging?"  ⚡":""));
         timerText.setText(timerRemaining>=0?clock(timerRemaining):"No timer");
         play.setText(music?"Ⅱ":"▶");
@@ -364,6 +389,8 @@ public final class IslandService extends Service implements IslandEvents.Listene
             songName.setText("Nothing playing");
             artist.setText("Open your favorite music app");
             cover.setImageDrawable(null);
+            miniArt.setImageDrawable(null);
+            elapsed.setText("0:00"); durationLabel.setText("0:00");
             progress.setEnabled(false);
             if(!scrubbing)progress.setProgress(0);
             return;
@@ -375,7 +402,9 @@ public final class IslandService extends Service implements IslandEvents.Listene
         Bitmap art=m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
         if(art==null)art=m.getBitmap(MediaMetadata.METADATA_KEY_ART);
         cover.setImageBitmap(art);
+        miniArt.setImageBitmap(art);
         long duration=m.getLong(MediaMetadata.METADATA_KEY_DURATION);
+        durationLabel.setText(formatTime(duration));
         PlaybackState state=mediaController.getPlaybackState();
         progress.setEnabled(duration>0);
         if(duration>0&&state!=null&&!scrubbing){
@@ -385,7 +414,12 @@ public final class IslandService extends Service implements IslandEvents.Listene
                     state.getLastPositionUpdateTime())*state.getPlaybackSpeed());
             }
             progress.setProgress((int)(1000L*Math.max(0,Math.min(position,duration))/duration));
+            elapsed.setText(formatTime(position));
         }
+    }
+    private String formatTime(long ms){
+        long seconds=Math.max(0,ms/1000);
+        return String.format(Locale.US,"%d:%02d",seconds/60,seconds%60);
     }
     private String clock(long ms){
         long sec=Math.max(0,(ms+999)/1000);
