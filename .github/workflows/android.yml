@@ -5,10 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: islandone-preview
-  cancel-in-progress: true
-
 permissions:
   contents: write
 
@@ -46,6 +42,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          HEAD_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq '.sha')"
+          if [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "Skipping stale commit $GITHUB_SHA, current main is $HEAD_SHA"
+            exit 0
+          fi
           NOTES="Automatically built early preview. Android debug signing keys can change between builds; uninstall the previous preview if Android rejects an update. NOT production signed."
           if gh release view nightly >/dev/null 2>&1; then
             gh release upload nightly IslandOne-preview.apk version.json --clobber
