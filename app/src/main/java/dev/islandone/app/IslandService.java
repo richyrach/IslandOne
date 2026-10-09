@@ -51,7 +51,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
     private WindowManager wm;
     private WindowManager.LayoutParams params;
     private FrameLayout bubble;
-    private LinearLayout mini, details, alertPanel;
+    private LinearLayout mini, details, alertPanel, actionsRow, extras;
     private TextView miniLeft,miniRight,songName,artist,play,batteryText,timerText,alertText,elapsed,durationLabel;
     private ImageView miniArt;
     private ImageView cover;
@@ -69,6 +69,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
     private final Runnable clearAlert=()->{
         currentAlert=null;
         if(alertPanel!=null)alertPanel.setVisibility(View.GONE);
+        if(actionsRow!=null)actionsRow.setVisibility(View.GONE);
         if(expanded)resize(true,false);
     };
     private final Runnable tick=new Runnable(){
@@ -208,13 +209,14 @@ public final class IslandService extends Service implements IslandEvents.Listene
         details.addView(transport,space(-1,56,3));
 
         LinearLayout divider=row();divider.setBackgroundColor(0xFF252732);
-        details.addView(divider,space(-1,1,16));
+        extras=col();
+        extras.addView(divider,space(-1,1,16));
         LinearLayout data=row();
         batteryText=text("BATTERY  —",12,0xFF9FECCC,true);
         timerText=text("No timer",12,MUTED,true);
         data.addView(batteryText,new LinearLayout.LayoutParams(0,d(33),1));
         data.addView(timerText);
-        details.addView(data,space(-1,33,8));
+        extras.addView(data,space(-1,33,8));
 
         LinearLayout timers=row();timers.setGravity(Gravity.CENTER);
         for(int minutes:new int[]{5,10,25}){
@@ -228,7 +230,8 @@ public final class IslandService extends Service implements IslandEvents.Listene
         stop.setBackground(bg(0xFF342126,12));
         timers.addView(stop,space(40,37,0));
         stop.setOnClickListener(v->{stopTimer();autoClose(8000);});
-        details.addView(timers,space(-1,38,5));
+        extras.addView(timers,space(-1,38,5));
+        details.addView(extras);
 
         alertPanel=col();alertPanel.setVisibility(View.GONE);
         alertPanel.setPadding(d(13),d(12),d(13),d(12));
@@ -236,6 +239,9 @@ public final class IslandService extends Service implements IslandEvents.Listene
         TextView caption=text("NEW ACTIVITY",9,PURPLE,true);
         alertText=text("",13,WHITE,false);
         alertPanel.addView(caption);alertPanel.addView(alertText,space(-1,22,2));
+        actionsRow=row();actionsRow.setGravity(Gravity.END);
+        actionsRow.setVisibility(View.GONE);
+        alertPanel.addView(actionsRow,space(-1,36,4));
         alertPanel.setOnClickListener(v->{
             if(currentAlert!=null&&currentAlert.action!=null){
                 try{currentAlert.action.send();}catch(PendingIntent.CanceledException ignored){}
@@ -280,7 +286,12 @@ public final class IslandService extends Service implements IslandEvents.Listene
         if(animation!=null)animation.cancel();
         expanded=show;
         int width=d(show?Math.min(screenWidthDp()-16,360):preferredWidth());
-        int height=d(show?(alertPanel.getVisibility()==View.VISIBLE?463:389):preferredHeight());
+        boolean hasAlert=alertPanel.getVisibility()==View.VISIBLE;
+        boolean hasActions=actionsRow.getVisibility()==View.VISIBLE;
+        boolean hasExtras=extras.getVisibility()==View.VISIBLE;
+        int expandedHeight=hasExtras?374:274;
+        if(hasAlert)expandedHeight+=hasActions?110:80;
+        int height=d(show?expandedHeight:preferredHeight());
         params.y=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("offset",0));
         params.x=d(getSharedPreferences("island_config",MODE_PRIVATE).getInt("horizontal",0));
         if(!animate){
@@ -317,6 +328,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
         if(alertPanel==null)return;
         main.removeCallbacks(clearAlert);
         currentAlert=null;
+        actionsRow.setVisibility(View.GONE);
         alertText.setText(title+"  ·  "+body);
         alertPanel.setVisibility(View.VISIBLE);
         resize(true,true);
@@ -327,6 +339,20 @@ public final class IslandService extends Service implements IslandEvents.Listene
         main.removeCallbacks(clearAlert);
         currentAlert=alert;
         alertText.setText(alert.title+"  ·  "+alert.text);
+        actionsRow.removeAllViews();
+        int count=alert.buttons==null?0:alert.buttons.length;
+        actionsRow.setVisibility(count>0?View.VISIBLE:View.GONE);
+        if(count>0){
+            for(android.app.Notification.Action action:alert.buttons){
+                TextView chip=text(action.title.toString().toUpperCase(Locale.getDefault()),11,PURPLE,true);
+                chip.setGravity(Gravity.CENTER);chip.setPadding(d(9),0,d(9),0);
+                chip.setOnClickListener(v->{
+                    try{action.actionIntent.send();}catch(PendingIntent.CanceledException ignored){}
+                    clearAlert.run();resize(false,true);
+                });
+                actionsRow.addView(chip,space(-2,36,0));
+            }
+        }
         alertPanel.setVisibility(View.VISIBLE);
         resize(true,true);
         main.postDelayed(clearAlert,6000);
@@ -385,6 +411,11 @@ public final class IslandService extends Service implements IslandEvents.Listene
         timerText.setText(timerRemaining>=0?clock(timerRemaining):"No timer");
         play.setText(music?"Ⅱ":"▶");
         MediaMetadata m=mediaController==null?null:mediaController.getMetadata();
+        int extrasVisibility=m==null?View.VISIBLE:View.GONE;
+        if(extras.getVisibility()!=extrasVisibility){
+            extras.setVisibility(extrasVisibility);
+            if(expanded)resize(true,false);
+        }
         if(m==null){
             songName.setText("Nothing playing");
             artist.setText("Open your favorite music app");
@@ -467,7 +498,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
     @Override public int onStartCommand(Intent intent,int flags,int id){
         if(intent!=null&&STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
         if(intent!=null&&SETTINGS.equals(intent.getAction()))resize(expanded,false);
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
     @Override public void onDestroy(){
         main.removeCallbacks(tick);main.removeCallbacks(collapse);main.removeCallbacks(clearAlert);
