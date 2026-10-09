@@ -34,6 +34,8 @@ import android.view.WindowManager;
 import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ImageButton;
+import android.content.res.ColorStateList;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -52,7 +54,8 @@ public final class IslandService extends Service implements IslandEvents.Listene
     private WindowManager.LayoutParams params;
     private FrameLayout bubble;
     private LinearLayout mini, details, alertPanel, actionsRow, extras;
-    private TextView miniLeft,miniRight,songName,artist,play,batteryText,timerText,alertText,elapsed,durationLabel;
+    private TextView miniLeft,miniRight,songName,artist,batteryText,timerText,alertText,elapsed,durationLabel;
+    private ImageButton play;
     private ImageView miniArt;
     private ImageView cover;
     private SeekBar progress;
@@ -121,10 +124,17 @@ public final class IslandService extends Service implements IslandEvents.Listene
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(w<0?w:d(w),h<0?h:d(h));
         p.topMargin=d(top);return p;
     }
-    private TextView control(String icon,Runnable run){
-        TextView v=text(icon,23,WHITE,true);v.setGravity(Gravity.CENTER);
+    private ImageButton control(int resource,Runnable run){
+        ImageButton v=new ImageButton(this);
+        v.setImageResource(resource);
+        v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        v.setImageTintList(ColorStateList.valueOf(WHITE));
+        v.setPadding(d(15),d(13),d(15),d(13));
         v.setBackground(bg(0xFF262833,24));
-        v.setOnClickListener(view->{run.run();autoClose(10000);});
+        v.setOnClickListener(view->{
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            run.run();autoClose(10000);
+        });
         return v;
     }
     private void createBubble(){
@@ -147,7 +157,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
         TextView center=text(" ",12,WHITE,false);
         mini.addView(center,new LinearLayout.LayoutParams(0,-1,1));
         mini.addView(miniRight);
-        mini.setOnClickListener(v->resize(true,true));
+        mini.setOnClickListener(v->{v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);resize(true,true);});
         FrameLayout.LayoutParams compactLp=new FrameLayout.LayoutParams(-1,-1);
         bubble.addView(mini,compactLp);
 
@@ -199,9 +209,9 @@ public final class IslandService extends Service implements IslandEvents.Listene
         times.addView(durationLabel);
         details.addView(times,space(-1,19,0));
         LinearLayout transport=row();transport.setGravity(Gravity.CENTER);
-        TextView previous=control("⏮",()->mediaAction(-1));
-        play=control("▶",()->mediaAction(0));
-        TextView next=control("⏭",()->mediaAction(1));
+        ImageButton previous=control(android.R.drawable.ic_media_previous,()->mediaAction(-1));
+        play=control(android.R.drawable.ic_media_play,()->mediaAction(0));
+        ImageButton next=control(android.R.drawable.ic_media_next,()->mediaAction(1));
         transport.addView(previous,space(58,48,0));
         LinearLayout.LayoutParams middle=space(67,52,0);middle.leftMargin=d(18);middle.rightMargin=d(18);
         play.setBackground(bg(0xFF342845,25));transport.addView(play,middle);
@@ -409,7 +419,7 @@ public final class IslandService extends Service implements IslandEvents.Listene
         miniLeft.setVisibility(music?View.GONE:View.VISIBLE);
         batteryText.setText("BATTERY  "+(batteryPercent<0?"—":batteryPercent+"%")+(charging?"  ⚡":""));
         timerText.setText(timerRemaining>=0?clock(timerRemaining):"No timer");
-        play.setText(music?"Ⅱ":"▶");
+        play.setImageResource(music?android.R.drawable.ic_media_pause:android.R.drawable.ic_media_play);
         MediaMetadata m=mediaController==null?null:mediaController.getMetadata();
         int extrasVisibility=m==null?View.VISIBLE:View.GONE;
         if(extras.getVisibility()!=extrasVisibility){
