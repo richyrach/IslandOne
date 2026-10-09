@@ -124,9 +124,9 @@ public final class MainActivity extends Activity {
         github.setOnClickListener(v->open(new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/richyrach/IslandOne"))));
         brand.addView(github);content.addView(brand);
 
-        TextView heading=label("Everything happening.\nOne little island.",30,INK,true);
+        TextView heading=label("Make it yours.",31,INK,true);
         heading.setLineSpacing(dp(4),1f);content.addView(heading,mt(-2,32));
-        content.addView(label("Your music, alerts, charging and timers. Right where you need them.",14,QUIET,false),mt(-2,12));
+        content.addView(label("Music, alerts, charging and timers — in one floating pill.",14,QUIET,false),mt(-2,12));
 
         LinearLayout active=card();active.setPadding(dp(18),dp(17),dp(18),dp(17));
         LinearLayout activeRow=line();
@@ -246,8 +246,23 @@ public final class MainActivity extends Activity {
     private LinearLayout styleChoice(String name,boolean round) {
         LinearLayout card=column();card.setGravity(Gravity.CENTER);
         card.setBackground(background(SURFACE,20,STROKE));
-        TextView symbol=label(round?"━━━━":"▰",26,INK,true);symbol.setGravity(Gravity.CENTER);
-        card.addView(symbol);
+        LinearLayout sample=line();sample.setGravity(Gravity.CENTER_VERTICAL);
+        sample.setPadding(dp(8),0,dp(10),0);
+        sample.setBackground(background(0xFF08090E,round?19:8,0));
+        View art=new View(this);
+        GradientDrawable color=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,new int[]{0xFFF19ABE,0xFF7B6BE5});
+        color.setCornerRadius(dp(round?8:4));art.setBackground(color);
+        sample.addView(art,lp(22,22));
+        View empty=new View(this);sample.addView(empty,new LinearLayout.LayoutParams(0,1,1f));
+        int[] bars={9,17,12,21};
+        for(int h:bars) {
+            View bar=new View(this);bar.setBackground(background(0xFFCAA9F6,2,0));
+            LinearLayout.LayoutParams p=lp(2,h);p.leftMargin=dp(2);sample.addView(bar,p);
+        }
+        LinearLayout.LayoutParams previewParams=lp(96,38);
+        previewParams.gravity=Gravity.CENTER_HORIZONTAL;
+        card.addView(sample,previewParams);
         TextView caption=label(name,13,INK,true);caption.setGravity(Gravity.CENTER);
         card.addView(caption,mt(29,3));
         if(round)styleRoundedLabel=caption;else styleFlatLabel=caption;
