@@ -1,6 +1,9 @@
 plugins {
     id 'com.android.application'
 }
+def runNumber = System.getenv("GITHUB_RUN_NUMBER")
+def previewNumber = runNumber != null ? runNumber.toInteger() : 2
+
 android {
     namespace 'dev.islandone.app'
     compileSdk 35
@@ -8,8 +11,11 @@ android {
         applicationId 'dev.islandone.app'
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 200 + previewNumber
+        versionName "0.2.${previewNumber}"
+    }
+    buildFeatures {
+        buildConfig true
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
